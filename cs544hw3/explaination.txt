@@ -1,0 +1,23 @@
+The first thing that came to my mind about adding features is to filter out stopwords, i searched for any list that is available
+that i can use directly. Thats how I added ntlk.corpus.stopwords.
+I started filtering out the stopwords before inserting values into the feat dictionary. I got a slight increase in accuracy from .77 to .79
+Seeing some process, I started to filter out more words that seem to be not in the list. I added a list to filter out more words like whom, yesterday, etc. but after running on my dev data i found the accuracy decrease to .75
+So, I started to use regular expressions to remove out punctuations from train.tsv. The accuracy increased to .80
+
+I got my first 2 features, 1 is filtering out stop words and 2 is removing punctuations.
+
+To improve my results, I read the slides from the lecture and started adding bigrams and trigrams to the feat list.
+To my surprise, after adding bigrams, the accuracy decreased to .78 from .80. After checking this on blind data by submitting on the vocarum the results were nto encouraing, the results on blind data showed .79
+I tried adding trigrams to the set, nothing changed much. Then, I tested both bigrams and trigrams without removing any stopwords and punctuations. They was a slight increase n accuracy to .80 on Dev data.
+But removing bigramsn and adding only trigrams along with my features 1,2, my results showed .81. Running the same on vocarum showed .81333
+
+So, I added my 3rd features i.e., adding Trigrams without filtering stopwords and punctuations from data.
+
+After suggestions from sides about adding pos, i tried all the pos tagging from each word but i couldn'r improve the results.
+I stopped researching about the pos tagging and started examining the two data sets. Shakesphere's peom seemed longer each line than the Emaily's poetry.
+Thats how i added my 4th feature i.e, calucating no of words in each line and a that as a feature.
+I also added the 5th feature i.e average length of each word in a line based on the 4th feature. My accuracy improved rastically from .81 to .91 on dev data and hidden data.
+
+I tried to check the other features like no of syllables in each word etc, but they did not work. I sense that shakesphere peorty had some rhyming words in the end of the line, for that i added lenths of last word for each line, I did noot get much improvement.
+
+I triee checing the first word for each line an this improved my accuracy to 91% on dev data and 92% on hidden data. That is my 6th feature, ie., length of first char of each word.
