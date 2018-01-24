@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+import argparse # optparse is deprecated
+from itertools import islice # slicing for iterators
+import spacy
+import math
+import nltk
+from difflib import SequenceMatcher
+from nltk import ngrams
+from nltk.tokenize import TreebankWordTokenizer
+
+import fuzzywuzzy
+from fuzzywuzzy import fuzz,process
+kTOKENIZER = TreebankWordTokenizer()
+
+
+def word_matches(h, ref):
+    return sum(1 for w in h if w in ref)
+
+def fuzzy(h,ref):
+    return fuzz.ratio(h,ref)
+
+def lemma_meteor(h,ref):
+    commons = 0
+    nlp = spacy.load("en")
+    h_nlp = nlp(h).text.split()
+    ref_nlp = nlp(ref).text.split()
+    ref_new = [word.lemma_ for word in ref_nlp]
+    for i in h_nlp:
+        if i.lemma_ in ref_new:
+            commons += 1
+    p = commons * 1.0 / len(h_nlp)
+    r = commons * 1.0 / len(ref_nlp)
+    if p != 0 and r != 0:
+        return (p * r) / (((1 - 0.8) * r) + (0.8 * p))
+    else:
+        return 0
+
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+def penalty_meteor(chunks,h,ref):
+    commons = 0
+    for i in h:
+        if i.replace('.', '') in ref:
+            commons += 1
+    p = commons * 1.0 / len(h)
+    r = commons * 1.0 / len(ref)
+    if p != 0 and r != 0:
+        return ((p * r) / (((1 - 0.9) * r) + (0.9 * p)))*(1 - (chunks*1.0 / commons))
+    else:
+        return 0
+
+
+def simple_meteor(h,ref):
+    commons = 0
+    # h = sent_tokenize()
+    for i in h:
+        if i in ref:
+            commons += 1
+    p = commons*1.0/len(h)
+    r = commons*1.0/len(ref)
+    if p!=0 and r!=0:
+        return (p*r)/(((1-0.8)*r) + (0.8*p))
+    else:
+        return 0
+
+def cal_chunks(h,ref):
+    chunks = 0
+    h = list(h)
+    ref = list(ref)
+    for i in range(len(h)):
+        if h[i] not in ref:
+            chunks += 1
+    # print chunks
+    return chunks
+
+def bleu(h, ref):
+    gram1 = ngrams(h,1)
+    g1m, g2m, g3m, g4m = 1, 1, 1, 1
+    g1m_len, g2m_len, g3m_len, g4m_len = 1, 1, 1, 1
+    gram1_ref = ngrams(ref,1)
+    for i in gram1:
+        g1m_len += 1
+        if i in gram1_ref:
+            g1m +=1
+    # print g1m
+    gram2 = ngrams(h,2)
+    gram2_ref = ngrams(ref,2)
+    for i in gram2:
+        g2m_len += 1
+        if i in gram2_ref:
+            g2m +=1
+    gram3 = ngrams(h,3)
+    gram3_ref = ngrams(ref,3)
+    for i in gram3:
+        g3m_len += 1
+        if i in gram3_ref:
+            g3m +=1
+    gram4 = ngrams(h,4)
+    gram4_ref = ngrams(ref,4)
+    for i in gram4:
+        g4m_len += 1
+        if i in gram4_ref:
+            g4m +=1
+    bp = math.exp(1-(len(ref)*1.0/len(h)))
+    test = (g1m*1.0/g1m_len) * (g2m*1.0/g2m_len) * (g3m*1.0/g3m_len) * (g4m*1.0/g4m_len)
+    return float(test**(1.0/4))*bp
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Evaluate translation hypotheses.')
+    parser.add_argument('-i', '--input', default='data/hyp1-hyp2-ref',
+            help='input file (default data/hyp1-hyp2-ref)')
+    parser.add_argument('-n', '--num_sentences', default=None, type=int,
+            help='Number of hypothesis pairs to evaluate')
+    # note that if x == [1, 2, 3], then x[:None] == x[:] == x (copy); no need for sys.maxint
+    opts = parser.parse_args()
+    # global g1m, g2m, g3m, g4m, g1m_len, g2m_len, g3m_len, g4m_len
+
+    # we create a generator and avoid loading all sentences into a list
+    def sentences():
+        with open(opts.input) as f:
+            for pair in f:
+                yield [sentence.strip() for sentence in pair.split(' ||| ')]
+ 
+    # note: the -n option does not work in the original code
+    for h1, h2, ref in islice(sentences(), opts.num_sentences):
+        rset = set(ref.split())
+        # stats1 = get_bleu_stats(ref.split(),h1.split())
+        # stats2 = get_bleu_stats(ref.split(),h2.split())
+        # h1_match = (0.1 * bleu(h1.split(),ref.split())) + (0.5 * similar(h1,ref)) + (0.2 * simple_meteor(h1.split(),rset)) + (0.2 * fuzzy(h1,ref))
+        # h2_match = (0.1 * bleu(h2.split(),ref.split())) + (0.5 * similar(h2,ref)) + (0.2 * simple_meteor(h2.split(),rset)) + (0.2 * fuzzy(h2,ref))
+        h1_match = lemma_meteor(h1,ref)
+        h2_match = lemma_meteor(h1,ref)
+        # h1_match = fuzzy(h1,ref)
+        # h2_match = fuzzy(h2,ref)
+        # h1_match = bleu(h1,ref)
+        # h2_match = bleu(h2,ref)
+        # h2_match = calculate_bleu(stats2)
+        # h1_match = similar(h1,ref)
+        # h2_match = similar(h2,ref)
+        # h1_chunks = cal_chunks(h1,ref)
+        # h1_match = penalty_meteor(h1_chunks,h1, rset)
+        # h2_chunks = cal_chunks(h2,ref)
+        # h2_match = penalty_meteor(h2_chunks,h2, rset)
+        # h1_match = simple_meteor(h1, rset)
+        # h2_match = simple_meteor(h2, rset)
+        print(1 if h1_match > h2_match else # \begin{cases}
+                (0 if h1_match == h2_match
+                    else -1)) # \end{cases}
+ 
+# convention to allow import of this file as a module
+if __name__ == '__main__':
+    main()
